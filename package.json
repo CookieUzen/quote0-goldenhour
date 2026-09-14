@@ -1,0 +1,23 @@
+{
+  "name": "quote0-goldenhour",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Renders a shared golden-hour / time-of-day card for two places, for the Quote/0 e-ink display.",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.53",
+    "sharp": "^0.33.5",
+    "suncalc": "^1.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/suncalc": "^1.9.2",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
