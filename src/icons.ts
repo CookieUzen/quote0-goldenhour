@@ -140,3 +140,132 @@ function drawHorizonSun(
     ctx.stroke();
   }
 }
+
+// ---------------------------------------------------------------------------
+// Tiny 1-bit weather glyphs (WMO codes from Open-Meteo), for the city tags.
+// ---------------------------------------------------------------------------
+
+export type WeatherKind =
+  | 'clear'
+  | 'partly'
+  | 'cloudy'
+  | 'fog'
+  | 'drizzle'
+  | 'rain'
+  | 'snow'
+  | 'storm';
+
+export function weatherKind(code: number): WeatherKind {
+  if (code === 0) return 'clear';
+  if (code <= 2) return 'partly';
+  if (code === 3) return 'cloudy';
+  if (code === 45 || code === 48) return 'fog';
+  if (code >= 51 && code <= 57) return 'drizzle';
+  if ((code >= 61 && code <= 67) || (code >= 80 && code <= 82)) return 'rain';
+  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return 'snow';
+  if (code >= 95 && code <= 99) return 'storm';
+  return 'cloudy';
+}
+
+/**
+ * Draws a small weather glyph centred at (cx, cy) inside an s×s box.
+ * `code < 0` (no data) should not be passed here — callers check first.
+ */
+export function drawWeatherIcon(
+  ctx: SKRSContext2D,
+  code: number,
+  cx: number,
+  cy: number,
+  s = 13,
+): void {
+  const kind = weatherKind(code);
+  ctx.save();
+  ctx.translate(cx - s / 2, cy - s / 2);
+  ctx.strokeStyle = '#000';
+  ctx.fillStyle = '#000';
+  ctx.lineWidth = 1;
+
+  switch (kind) {
+    case 'clear': {
+      const c = s / 2;
+      const r = s * 0.24;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(c, c, r, 0, Math.PI * 2);
+      ctx.fill();
+      for (let i = 0; i < 8; i++) {
+        const a = (i * Math.PI) / 4;
+        ctx.beginPath();
+        ctx.moveTo(c + Math.cos(a) * (r + 1), c + Math.sin(a) * (r + 1));
+        ctx.lineTo(c + Math.cos(a) * (r + 3.5), c + Math.sin(a) * (r + 3.5));
+        ctx.stroke();
+      }
+      break;
+    }
+    case 'partly':
+      // small sun peeking above the cloud, top-right
+      ctx.beginPath();
+      ctx.arc(s * 0.66, s * 0.3, s * 0.17, 0, Math.PI * 2);
+      ctx.fill();
+      cloudPath(ctx, s * 0.02, s * 0.8, s * 0.36);
+      break;
+    case 'cloudy':
+      cloudPath(ctx, s * 0.05, s * 0.8, s * 0.42);
+      break;
+    case 'fog':
+      for (let i = 0; i < 3; i++) {
+        const y = s * (0.3 + i * 0.2);
+        const ind = (i % 2) * 0.1;
+        ctx.beginPath();
+        ctx.moveTo(s * (0.08 + ind), y);
+        ctx.lineTo(s * (0.92 - ind), y);
+        ctx.stroke();
+      }
+      break;
+    case 'drizzle':
+    case 'rain': {
+      cloudPath(ctx, s * 0.05, s * 0.6, s * 0.36);
+      const n = kind === 'rain' ? 3 : 2;
+      for (let i = 0; i < n; i++) {
+        const x = s * (0.28 + i * 0.22);
+        ctx.beginPath();
+        ctx.moveTo(x, s * 0.72);
+        ctx.lineTo(x - 1, s * 0.92);
+        ctx.stroke();
+      }
+      break;
+    }
+    case 'snow':
+      cloudPath(ctx, s * 0.05, s * 0.6, s * 0.36);
+      for (let i = 0; i < 3; i++) {
+        ctx.fillRect(s * (0.26 + i * 0.24) - 0.75, s * 0.78, 1.5, 1.5);
+      }
+      break;
+    case 'storm':
+      cloudPath(ctx, s * 0.05, s * 0.56, s * 0.36);
+      ctx.beginPath();
+      ctx.moveTo(s * 0.55, s * 0.58);
+      ctx.lineTo(s * 0.38, s * 0.82);
+      ctx.lineTo(s * 0.49, s * 0.82);
+      ctx.lineTo(s * 0.42, s * 1.0);
+      ctx.lineTo(s * 0.62, s * 0.72);
+      ctx.lineTo(s * 0.52, s * 0.72);
+      ctx.closePath();
+      ctx.fill();
+      break;
+  }
+  ctx.restore();
+}
+
+/** Scallop-top cloud outline; bottom edge at `yb`, total width 2.8h. */
+function cloudPath(ctx: SKRSContext2D, x: number, yb: number, h: number): void {
+  const rS = h * 0.4;
+  const rM = h * 0.6;
+  ctx.beginPath();
+  ctx.moveTo(x, yb);
+  ctx.arc(x + rS, yb, rS, Math.PI, 0, false);
+  ctx.arc(x + 2 * rS + rM, yb, rM, Math.PI, 0, false);
+  ctx.arc(x + 2 * rS + 2 * rM + rS, yb, rS, Math.PI, 0, false);
+  ctx.closePath();
+  ctx.stroke();
+}
