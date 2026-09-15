@@ -124,8 +124,6 @@ export async function buildCanvas(now: Date, chart?: Buffer): Promise<CanvasPayl
     ...(wx ? { wx } : {}),
     ...(msg ? { msg } : {}),
     ...(plot ? { chart: `data:image/png;base64,${plot.toString('base64')}` } : {}),
-    // relative-time axis labels, aligned with the tick marks in the image
-    ...(plot ? { ticks: axisTicks(now).map((t) => ({ t: fmtOffset(t.offset) })) } : {}),
   };
   const rows: Array<Record<string, unknown>> =
     layout === 'chart'
@@ -144,15 +142,13 @@ export async function buildCanvas(now: Date, chart?: Buffer): Promise<CanvasPayl
             ],
           }),
           // relative-time tick row ("-8 … now … +14"), aligned to the image's
-          // 8px plot margins inside the 4px window padding
+          // 8px plot margins inside the 4px window padding. Static spans —
+          // the device template's `get` can't read $for loop variables.
           el('div', {
             tw: 'flex flex-row justify-between shrink-0 text-pixel-8 pl-[12px] pr-[4px]',
-            children: [
-              el('span', {
-                $for: { items: 'inputData.ticks', as: 'tick' },
-                children: '{{get tick "t" default=""}}',
-              }),
-            ],
+            children: axisTicks(now).map((t) =>
+              el('span', { children: fmtOffset(t.offset) }),
+            ),
           }),
           ...(wx ? [weatherRow()] : []),
         ]
