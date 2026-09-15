@@ -8,6 +8,7 @@
   packages = [
     pkgs.git
     pkgs.dejavu_fonts
+    pkgs.secretspec
   ];
 
   # https://devenv.sh/languages/

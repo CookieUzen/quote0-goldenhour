@@ -1,5 +1,12 @@
 # ☀️ Quote/0 Golden Hour
 
+> [!WARNING]
+> **⚠️ 100% VIBECODED ⚠️** This entire project — design, architecture, code,
+> commit messages, and this warning — was produced through pure vibe-coding
+> with an AI pair programmer. A human pointed at things and said "make it
+> prettier" and "now push it to a device." Proceed with appropriate levels of
+> trust, skepticism, and awe.
+
 A shared, minimal information companion for two distant places. This project renders a 296×152, 1-bit card for the [Quote/0](https://dot.mindreset.tech) e-ink display, creating a quiet connection between two people by visualizing their shared relationship with the sun.
 
 ## 🌟 The Concept
@@ -50,6 +57,35 @@ This generates a PNG in `out/card-f0.png`.
   ```sh
   FRAMES=4 npm run dev
   ```
+- **Custom title-bar message**: right side of the bar, auto-shrinks / wraps / ellipsizes.
+  ```sh
+  CARD_MSG="good morning :)" npm run dev
+  ```
+- **Old two-column layout**: `CARD_STYLE=columns npm run dev`.
+
+## 📡 Pushing to the device
+
+Secrets are declared in `secretspec.toml` and stored with the dotenv provider
+(`.env`, git-ignored). Set them once:
+
+```sh
+secretspec set QUOTE0_API_KEY --provider dotenv    # Dot. app key (dot_app_...)
+secretspec set QUOTE0_DEVICE_ID --provider dotenv  # device ID from the Dot. app
+```
+
+Then run through secretspec so the values land in the environment:
+
+```sh
+secretspec run --provider dotenv -- npm run push   # one push, now
+secretspec run --provider dotenv -- npm run loop   # every INTERVAL sec (default 300)
+INTERVAL=900 secretspec run --provider dotenv -- npm run loop
+```
+
+The card is rendered, thresholded to 1-bit, and pushed to
+`POST /api/authV2/open/device/{deviceId}/image` (`ditherType: NONE`, since the
+image is already 1-bit). **The device needs an "Open API" content card in its
+loop task in the Dot. app**, otherwise pushed content has nowhere to show.
+`DRY_RUN=1` runs the whole pipeline without POSTing.
 
 ## ⚙️ Configuration
 
@@ -73,7 +109,7 @@ export const PLACES: Place[] = [
 
 ## 🛤 Roadmap
 
-- [ ] **Device Integration**: Implement `src/push.ts` to send rendered images directly to the Quote/0 REST API.
+- [x] **Device Integration**: `src/device.ts` + `src/push.ts` push rendered images to the Quote/0 REST API (`npm run push` / `npm run loop`).
 - [ ] **Dynamic Locations**: Feed coordinates via iOS Shortcuts (GPS) or Home Assistant.
 - [ ] **Pixel Fonts**: Replace DejaVu with an embedded bitmap pixel font for ultra-crisp 1-bit text.
 - [ ] **shared-state**: Integration with a backend to allow real-time "thinking of you" nudges.
