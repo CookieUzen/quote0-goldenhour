@@ -1,3 +1,4 @@
+import './net.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import sharp from 'sharp';
 import { buildFrame } from './card.js';

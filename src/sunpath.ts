@@ -1,5 +1,5 @@
 import SunCalc from 'suncalc';
-import type { Place } from './locations.js';
+import type { Place } from './store.js';
 
 /**
  * Data for the "shared sun" canvas: both cities' solar elevation sampled over

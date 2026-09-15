@@ -1,45 +1,21 @@
 import sharp from 'sharp';
-import { PLACES } from './locations.js';
 import { STAGE_LABEL, sunInfo, type Stage } from './stage.js';
 import { phaseOf, quoteFor } from './quotes.js';
 import { fetchWeather } from './weather.js';
 import { renderCard, renderSharedCard, type Column } from './render.js';
 import { goldenIntervals, sampleDay } from './sunpath.js';
+import { PLACES, getMessage } from './store.js';
 
 /** 'shared' = one 24h axis with both sun paths; 'columns' = the old two-column card. */
 const STYLE = process.env.CARD_STYLE === 'columns' ? 'columns' : 'shared';
 
-let lastGoodMsg: string | undefined;
-
 /**
- * Resolve the title-bar message. If MESSAGE_URL is set, it is fetched on every
- * build (plain text, or JSON with a "message" field) so a remote backend can
- * push fresh nudges; on fetch failure the last good value (or CARD_MSG) wins.
+ * The title-bar message: a message posted to the local API wins, then the
+ * CARD_MSG env fallback. When neither is set it stays undefined and the card
+ * templates fall through to their normal no-message rendering (the quote).
  */
-async function resolveMessage(): Promise<string | undefined> {
-  const url = process.env.MESSAGE_URL;
-  if (!url) return process.env.CARD_MSG || undefined;
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const text = (await res.text()).trim();
-    let msg = text;
-    if (text.startsWith('{')) {
-      try {
-        msg = ((JSON.parse(text) as { message?: string }).message ?? '').trim();
-      } catch {
-        /* keep raw text */
-      }
-    }
-    if (msg) {
-      lastGoodMsg = msg;
-      return msg;
-    }
-    console.warn('MESSAGE_URL returned empty content; keeping previous');
-  } catch (err) {
-    console.warn(`MESSAGE_URL fetch failed (${String(err)}); keeping previous`);
-  }
-  return lastGoodMsg ?? (process.env.CARD_MSG || undefined);
+function resolveMessage(): string | undefined {
+  return getMessage() ?? (process.env.CARD_MSG || undefined);
 }
 
 function localTime(d: Date, tz: string): string {
@@ -90,7 +66,7 @@ export interface CardData {
 
 /** Resolve message, weather columns, footer date and the phase quote. */
 export async function collect(now: Date): Promise<CardData> {
-  const msg = await resolveMessage();
+  const msg = resolveMessage();
   const cols: Column[] = [];
 
   for (const p of PLACES) {

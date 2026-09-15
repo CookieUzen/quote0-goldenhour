@@ -1,4 +1,4 @@
-import type { Place } from './locations.js';
+import type { Place } from './store.js';
 
 export interface Weather {
   tempC: number;

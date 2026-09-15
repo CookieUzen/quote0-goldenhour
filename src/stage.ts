@@ -1,5 +1,5 @@
 import SunCalc from 'suncalc';
-import type { Place } from './locations.js';
+import type { Place } from './store.js';
 
 export const STAGES = [
   'night',

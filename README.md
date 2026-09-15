@@ -119,9 +119,54 @@ echo 'INTERVAL=900' >> .env
 Logs: `docker compose logs -f`. Stop: `docker compose down`. The container
 runs as a non-root user and restarts automatically unless stopped.
 
+The API's state lives in `./state/message.json` (bind-mounted), so messages and
+city overrides survive restarts. The container runs as uid 1000 (`node`); make
+sure the host `state/` dir is writable by that user (`mkdir -p state`).
+
+## 🎛 Control API
+
+The loop also serves a tiny HTTP API (in `--loop` mode) for pushing messages and
+changing cities on the fly. It is meant to sit **behind Tailscale** — bind it to
+your tailnet IP with `BIND_ADDR` (Docker) or `HOST` (local) rather than exposing
+it publicly. Set `POST_TOKEN` to add a shared-password layer on every route.
+
+```sh
+# send a message (plain text or JSON); shown on the card within one push
+curl -X POST http://100.x.y.z:8787/message -d 'thinking of you :)'
+curl -X POST http://100.x.y.z:8787/message \
+  -H 'Content-Type: application/json' -d '{"message":"good morning","ttlSeconds":3600}'
+
+curl http://100.x.y.z:8787/message            # read current
+curl -X DELETE http://100.x.y.z:8787/message  # clear (falls back to CARD_MSG/quote)
+
+# fuzzy city lookup, then set city 1 or 2 by name — the best match is picked
+# automatically, and the candidate list is returned so you can correct it
+curl 'http://100.x.y.z:8787/geocode?q=Kyoto,Japan'
+curl -X POST http://100.x.y.z:8787/location/2 \
+  -H 'Content-Type: application/json' -d '{"query":"Uji, Japan"}'
+# picked the wrong one? choose another candidate from the same query with "pick"
+curl -X POST http://100.x.y.z:8787/location/2 \
+  -H 'Content-Type: application/json' -d '{"query":"Uji","pick":1}'
+# …or set explicit coordinates
+curl -X POST http://100.x.y.z:8787/location/1 \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"JAKARTA","lat":-6.2088,"lon":106.8456,"tz":"Asia/Jakarta"}'
+
+curl http://100.x.y.z:8787/location           # both current places
+curl http://100.x.y.z:8787/stats              # message + last 10 + locations + loop
+```
+
+If `POST_TOKEN` is set, add `-H 'Authorization: Bearer <token>'` to every call.
+The server is rate-limited to **one request per second** globally (429 otherwise).
+A message defaults to a **3-day TTL** (`MESSAGE_TTL`, `0` = never); `/stats`
+shows the last `MESSAGE_HISTORY_STATS` posts, while the full log is in the state
+file. Accepting a message or a new city re-renders and re-uploads the page
+**currently on screen**, *without advancing the loop* — so the pomodoro/rotation
+timing stays aligned and the scheduled pages resume on their own.
+
 ## ⚙️ Configuration
 
-Coordinates and timezones are stored in `src/locations.ts`. You can easily swap these for your own cities:
+Coordinates and timezones are stored as the `PLACES` defaults in `src/store.ts`, or overridden at runtime (persisted to the state file) via `POST /location/1|2`. Edit them in source for a permanent change:
 
 ```ts
 export const PLACES: Place[] = [
@@ -132,9 +177,12 @@ export const PLACES: Place[] = [
 
 ## 🗺 Project Architecture
 
-- `locations.ts`: Source of truth for coordinates and timezones.
+- `store.ts`: Default cities + persistent message/location state (`state/message.json`).
 - `stage.ts`: Calculates solar elevation and maps it to one of the 7 stages.
 - `weather.ts`: Fetches current temp from Open-Meteo.
+- `geocode.ts`: Fuzzy city lookup via the Open-Meteo Geocoding API (no key).
+- `net.ts`: Prefers IPv4 for outbound fetches (avoids broken-IPv6 stalls).
+- `server.ts`: Control API (`/message`, `/location`, `/geocode`, `/stats`).
 - `icons.ts`: Hand-drawn canvas functions for each stage icon.
 - `render.ts`: Composes the 296×152 layout, handles fonts and layout.
 - `index.ts`: Orchestrates the pipeline: Data $\rightarrow$ Image $\rightarrow$ 1-bit Threshold $\rightarrow$ File.

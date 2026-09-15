@@ -10,4 +10,17 @@ services:
     environment:
       INTERVAL: ${INTERVAL:-300}
       CARD_MSG: ${CARD_MSG:-}
-      MESSAGE_URL: ${MESSAGE_URL:-}
+      # --- local control API (put it behind Tailscale) ---
+      HOST: 0.0.0.0
+      PORT: ${PORT:-8787}
+      STATE_FILE: /app/state/message.json
+      POST_TOKEN: ${POST_TOKEN:-}
+      MESSAGE_TTL: ${MESSAGE_TTL:-259200}
+      MESSAGE_HISTORY: ${MESSAGE_HISTORY:-50}
+      MESSAGE_HISTORY_STATS: ${MESSAGE_HISTORY_STATS:-10}
+    # host bind: default loopback — set BIND_ADDR to your Tailscale IP
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:${PORT:-8787}:${PORT:-8787}"
+    volumes:
+      # persist message/location state across restarts
+      - ./state:/app/state

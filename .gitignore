@@ -1,6 +1,7 @@
 node_modules/
 dist/
 out/
+state/
 .devenv/
 devenv.local.nix
 *.log
