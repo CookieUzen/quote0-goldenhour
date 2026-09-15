@@ -3,16 +3,17 @@ import type { Place } from './locations.js';
 
 /**
  * Data for the "shared sun" canvas: both cities' solar elevation sampled over
- * a sliding 24h window that is always centred on "now" (12h either side), so
- * the current moment is fixed at the middle of the card and the curve scrolls
- * leftward as the day progresses.
+ * a sliding 12h window with "now" fixed 1/3 of the way in (4h behind, 8h
+ * ahead) — the recent past and the near future, not the whole day.
  *
- * Window hours are relative to the window start ([0, 24]); `startH` records
- * where the window begins in absolute UTC hours (relative to that UTC day's
- * midnight, may be negative) so axis ticks can show true UTC clock hours.
+ * Window hours are relative to the window start ([0, WINDOW_H]); `startH`
+ * records where the window begins in absolute UTC hours (relative to that UTC
+ * day's midnight, may be negative) so axis ticks can show true clock hours.
  */
 
 export const STEP_MIN = 5;
+export const WINDOW_H = 24; // total window width in hours
+export const NOW_H = 8; // "now" position within the window (1/3 of 24h)
 const H_PER_STEP = STEP_MIN / 60;
 
 export interface CityPath {
@@ -37,14 +38,14 @@ export function nowHours(now: Date, dayStart: Date): number {
 }
 
 /**
- * Sample the sun's elevation over the 24h window centred on `now`
- * (i.e. from now - halfHours to now + halfHours).
+ * Sample the sun's elevation over the sliding window: NOW_H hours before
+ * `now`, the rest after (12h total).
  */
-export function sampleDay(place: Place, now: Date, halfHours = 12): CityPath {
+export function sampleDay(place: Place, now: Date): CityPath {
   const dayStart = utcDayStart(now);
-  const startH = nowHours(now, dayStart) - halfHours;
+  const startH = nowHours(now, dayStart) - NOW_H;
   const startMs = dayStart.getTime() + startH * 3_600_000;
-  const count = (24 * 60) / STEP_MIN + 1;
+  const count = (WINDOW_H * 60) / STEP_MIN + 1;
   const elev: number[] = new Array(count);
   for (let i = 0; i < count; i++) {
     const t = new Date(startMs + i * STEP_MIN * 60_000);
@@ -53,18 +54,14 @@ export function sampleDay(place: Place, now: Date, halfHours = 12): CityPath {
   return { place, dayStart, startH, elev };
 }
 
-/** Linearly-interpolated elevation at window-relative hour `h` in [0, 24]. */
+/** Linearly-interpolated elevation at window-relative hour `h` in [0, WINDOW_H]. */
 export function elevationAtHour(p: CityPath, h: number): number {
-  const x = Math.min(Math.max(h, 0), 24) / H_PER_STEP;
+  const x = Math.min(Math.max(h, 0), WINDOW_H) / H_PER_STEP;
   const i = Math.min(Math.floor(x), p.elev.length - 2);
   const f = x - i;
   return p.elev[i] * (1 - f) + p.elev[i + 1] * f;
 }
 
-/**
- * Window-hour intervals [start, end) within [0, 24] where BOTH cities are
- * above the horizon simultaneously.
- */
 /** Elevation band that counts as golden hour (matches stage.ts's rule). */
 export const GOLD_LO = -4;
 export const GOLD_HI = 6;

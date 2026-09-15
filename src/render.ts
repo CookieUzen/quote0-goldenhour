@@ -1,7 +1,15 @@
 import { createCanvas, GlobalFonts, type SKRSContext2D } from '@napi-rs/canvas';
 import { drawIcon, drawWeatherIcon } from './icons.js';
 import { STAGE_LABEL, type Stage } from './stage.js';
-import { elevationAtHour, GOLD_HI, GOLD_LO, STEP_MIN, type CityPath } from './sunpath.js';
+import {
+  elevationAtHour,
+  GOLD_HI,
+  GOLD_LO,
+  NOW_H,
+  STEP_MIN,
+  WINDOW_H,
+  type CityPath,
+} from './sunpath.js';
 
 let FAMILY = 'sans-serif';
 let FAMILY_BOLD = 'sans-serif';
@@ -104,10 +112,10 @@ export function renderCard(cols: Column[], width = 296, height = 152, footer?: s
 // "Shared sun" canvas: one 24h UTC axis, both cities' sun paths overlaid.
 // ---------------------------------------------------------------------------
 
-const X0 = 10; // plot left
-const X1 = 286; // plot right
-const Y_TOP = 34; // plot top (= E_MAX elevation)
-const Y_BOT = 126; // plot bottom (= E_MIN elevation)
+const X0 = 8; // plot left
+const X1 = 288; // plot right (full width below the title bar)
+const Y_TOP = 38; // plot top (= E_MAX elevation)
+const Y_BOT = 122; // plot bottom (= E_MIN elevation)
 const E_MIN = -30;
 const E_MAX = 90;
 
@@ -120,6 +128,10 @@ export interface SharedInput {
   tempB: number | null;
   codeA: number; // WMO weather code, -1 = no data
   codeB: number;
+  stageA: Stage;
+  stageB: Stage;
+  /** Custom message drawn at the right of the title bar (e.g. "good morning :)"). */
+  msg?: string;
   footer: string;
   /** Axis labels are shown in this timezone's local clock (offset vs UTC, e.g. +7). */
   axisOffsetH: number;
@@ -137,7 +149,7 @@ export function renderSharedCard(inp: SharedInput, width = 296, height = 152): B
   ctx.strokeStyle = '#000';
   ctx.textBaseline = 'alphabetic';
 
-  const px = (h: number) => X0 + (h / 24) * (X1 - X0);
+  const px = (h: number) => X0 + (h / WINDOW_H) * (X1 - X0);
   const py = (e: number) =>
     Y_BOT - ((Math.min(Math.max(e, E_MIN), E_MAX) - E_MIN) / (E_MAX - E_MIN)) * (Y_BOT - Y_TOP);
 
@@ -192,55 +204,45 @@ export function renderSharedCard(inp: SharedInput, width = 296, height = 152): B
     ctx.fillText(label, cx, py(0) + 11);
   }
 
-  // now-line: always the exact centre of the card (window is centred on now)
+  // now-line: fixed 1/3 of the way across (window = NOW_H back, rest ahead)
   ctx.setLineDash([1, 3]);
   ctx.beginPath();
-  ctx.moveTo(px(12), Y_TOP);
-  ctx.lineTo(px(12), Y_BOT);
+  ctx.moveTo(px(NOW_H), Y_TOP);
+  ctx.lineTo(px(NOW_H), Y_BOT);
   ctx.stroke();
   ctx.setLineDash([]);
 
   // the two suns, right now (hollow marker = below the horizon)
-  const eA = elevationAtHour(inp.a, 12);
-  const eB = elevationAtHour(inp.b, 12);
-  drawSunDot(ctx, px(12), py(eA), false, eA < 0, inp.frame);
-  drawSunDot(ctx, px(12), py(eB), true, eB < 0, inp.frame);
+  const eA = elevationAtHour(inp.a, NOW_H);
+  const eB = elevationAtHour(inp.b, NOW_H);
+  drawSunDot(ctx, px(NOW_H), py(eA), false, eA < 0, inp.frame);
+  drawSunDot(ctx, px(NOW_H), py(eB), true, eB < 0, inp.frame);
 
-  // axis ticks at true UTC clock hours (every 3h within the window)
+  // axis ticks at true clock hours (every 2h within the window)
   ctx.font = fontPx(10);
   ctx.textAlign = 'center';
   const startH = inp.a.startH;
-  const firstTick = Math.ceil(startH / 3) * 3;
-  for (let i = 0; i <= 9; i++) {
-    const hAbs = firstTick + i * 3;
-    if (hAbs > startH + 24 + 1e-9) break;
+  const firstTick = Math.ceil(startH / 2) * 2;
+  for (let i = 0; i <= WINDOW_H / 2 + 1; i++) {
+    const hAbs = firstTick + i * 2;
+    if (hAbs > startH + WINDOW_H + 1e-9) break;
     const x = px(hAbs - startH);
     ctx.beginPath();
     ctx.moveTo(x, Y_BOT);
     ctx.lineTo(x, Y_BOT + 3);
     ctx.stroke();
     const clockH = Math.round(((((hAbs + inp.axisOffsetH) % 24) + 24) % 24));
-    ctx.fillText(String(clockH % 24).padStart(2, '0'), x, Y_BOT + 13);
+    if (x < X1 - 10) ctx.fillText(String(clockH % 24).padStart(2, '0'), x, Y_BOT + 13);
   }
 
-  // city tags: [swatch] NAME  temp  [weather] — place 0 left, place 1 right.
-  // Long names (e.g. JAKARTA + HONG KONG) don't both fit at full size, so pick
-  // the largest tag font that keeps the two tags on one line.
-  const margin = 16;
-  const tagPx =
-    [14, 13, 12, 11, 10].find(
-      (px) =>
-        tagWidth(ctx, px, inp.a.place.name, inp.tempA != null, inp.codeA >= 0) +
-          tagWidth(ctx, px, inp.b.place.name, inp.tempB != null, inp.codeB >= 0) <=
-        width - margin,
-    ) ?? 10;
-  drawCityTag(ctx, 8, inp.a.place.name, inp.tempA, inp.codeA, false, false, tagPx);
-  drawCityTag(ctx, width - 8, inp.b.place.name, inp.tempB, inp.codeB, true, true, tagPx);
+  // title bar: one row per city (chip, name, temp, weather, condition),
+  // custom message space on the right
+  drawTitleBar(ctx, inp);
 
-  // footer: date, bottom-left
+  // footer: date, centred under the plot
   ctx.font = fontPx(10);
-  ctx.textAlign = 'left';
-  ctx.fillText(inp.footer, 8, height - 3);
+  ctx.textAlign = 'center';
+  ctx.fillText(inp.footer, (X0 + X1) / 2, height - 3);
 
   return canvas.toBuffer('image/png');
 }
@@ -318,79 +320,98 @@ function drawSunDot(
   }
 }
 
-function tagWidth(
-  ctx: SKRSContext2D,
-  px: number,
-  name: string,
-  hasTemp: boolean,
-  hasIcon: boolean,
-): number {
-  const swatchW = 16;
-  const gap = 6;
-  ctx.font = fontPx(px, true);
-  let w = swatchW + gap + ctx.measureText(name).width;
-  if (hasTemp) {
-    ctx.font = fontPx(px);
-    w += gap + ctx.measureText('00\u00B0').width;
+function drawTitleBar(ctx: SKRSContext2D, inp: SharedInput): void {
+  const endA = drawCityLine(ctx, 8, 13, inp.a.place.name, false, inp.tempA, inp.codeA, inp.stageA);
+  const endB = drawCityLine(ctx, 8, 28, inp.b.place.name, true, inp.tempB, inp.codeB, inp.stageB);
+  if (inp.msg) {
+    // largest single-line font that fits between the city rows and the right
+    // edge; if even 10px overflows, stack the message on two 9px lines; if
+    // THAT overflows too, ellipsize rather than overlap the city rows
+    const msg = inp.msg;
+    const avail = 288 - Math.max(endA, endB) - 6;
+    const px = [14, 13, 12, 11, 10].find((p) => {
+      ctx.font = fontPx(p, true);
+      return ctx.measureText(msg).width <= avail;
+    });
+    ctx.textAlign = 'right';
+    if (px) {
+      ctx.font = fontPx(px, true);
+      ctx.fillText(msg, 288, 24);
+    } else {
+      ctx.font = fontPx(9, true);
+      const [l1, l2] = wrapTwo(msg, avail, ctx);
+      ctx.fillText(l1, 288, 16);
+      ctx.fillText(l2, 288, 29);
+    }
+    ctx.textAlign = 'left';
   }
-  if (hasIcon) w += gap + 13;
-  return w;
+  // separator under the bar
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(X0, 33);
+  ctx.lineTo(X1, 33);
+  ctx.stroke();
 }
 
-function drawCityTag(
+function drawCityLine(
   ctx: SKRSContext2D,
-  edgeX: number,
+  x: number,
+  y: number,
   name: string,
+  dashed: boolean,
   tempC: number | null,
   code: number,
-  rightAlign: boolean,
-  dashed: boolean,
-  px: number,
-): void {
-  const swatchW = 16;
-  const gap = 6;
-  const y = 16;
-  const iconS = 13;
-  const hasIcon = code >= 0;
-
-  ctx.font = fontPx(px, true);
-  const nameW = ctx.measureText(name).width;
-  const info = tempC != null ? `${Math.round(tempC)}\u00B0` : '';
-  ctx.font = fontPx(px);
-  const infoW = ctx.measureText(info).width;
-  const total =
-    swatchW + gap + nameW + (info ? gap + infoW : 0) + (hasIcon ? gap + iconS : 0);
-
-  let x = rightAlign ? edgeX - total : edgeX;
-
-  // line-style swatch over the city's hatch pattern so the tag can be matched
-  // to its curve AND its golden-hour band
-  ctx.lineWidth = 2;
-  ctx.setLineDash(dashed ? [3, 2] : []);
-  ditherRect(ctx, x, y - 9, swatchW, 7, dashed ? 'diag' : 'dots');
-  ctx.strokeStyle = '#000';
-  ctx.beginPath();
-  ctx.moveTo(x, y - 5);
-  ctx.lineTo(x + swatchW, y - 5);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  x += swatchW + gap;
-
+  stage: Stage,
+): number {
   ctx.textAlign = 'left';
-  ctx.font = fontPx(px, true);
-  ctx.fillText(name, x, y);
-  x += nameW + gap;
-  if (info) {
-    ctx.font = fontPx(px);
-    ctx.fillText(info, x, y);
-    x += infoW + gap;
+  ctx.fillStyle = '#000';
+  ditherRect(ctx, x, y - 8, 12, 6, dashed ? 'diag' : 'dots');
+  ctx.font = fontPx(11, true);
+  ctx.fillText(name, x + 16, y);
+  let cx = x + 16 + ctx.measureText(name).width + 4;
+  ctx.font = fontPx(11);
+  if (tempC != null) {
+    const t = `${Math.round(tempC)}\u00B0`;
+    ctx.fillText(t, cx, y);
+    cx += ctx.measureText(t).width + 4;
   }
-  if (hasIcon) {
-    drawWeatherIcon(ctx, code, x + iconS / 2, y - 5, iconS);
+  if (code >= 0) {
+    drawWeatherIcon(ctx, code, cx + 5.5, y - 4, 11);
+    cx += 15;
   }
+  ctx.font = fontPx(9, true);
+  ctx.fillText(STAGE_LABEL[stage], cx, y);
+  return cx + ctx.measureText(STAGE_LABEL[stage]).width;
 }
 
 type Pattern = 'dots' | 'diag';
+
+/** Split `msg` into two balanced lines each no wider than `avail`; ellipsizes
+ *  a line if a single word alone still overflows. */
+function wrapTwo(msg: string, avail: number, ctx: SKRSContext2D): [string, string] {
+  const words = msg.trim().split(/\s+/);
+  if (words.length === 1) return [ellipsize(msg, avail, ctx), ''];
+  let best: [string, string] = [msg, ''];
+  let bestMax = Infinity;
+  for (let i = 1; i < words.length; i++) {
+    const a = words.slice(0, i).join(' ');
+    const b = words.slice(i).join(' ');
+    const m = Math.max(ctx.measureText(a).width, ctx.measureText(b).width);
+    if (m < bestMax) {
+      bestMax = m;
+      best = [a, b];
+    }
+  }
+  return [ellipsize(best[0], avail, ctx), ellipsize(best[1], avail, ctx)];
+}
+
+function ellipsize(s: string, avail: number, ctx: SKRSContext2D): string {
+  if (ctx.measureText(s).width <= avail) return s;
+  while (s.length > 1 && ctx.measureText(s + '\u2026').width > avail) {
+    s = s.slice(0, -1);
+  }
+  return s.replace(/[\s,.;:!?-]+$/, '') + '\u2026';
+}
 
 /** Hatch fills, snapped to integer pixels (fractional coords + 1px rects
  *  anti-alias into a solid blob the e-ink threshold renders as pure black). */
