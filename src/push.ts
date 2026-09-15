@@ -1,5 +1,5 @@
 import { setupFonts } from './render.js';
-import { buildBarePlot, buildFrameAndText } from './card.js';
+import { buildFrameAndText } from './card.js';
 import { buildCanvas } from './canvas.js';
 import { pushCard, pushCanvas, pushText, requireConfig } from './device.js';
 
@@ -31,7 +31,7 @@ async function pushOnce(refreshNow: boolean): Promise<void> {
     ? [
         'canvas',
         pushCanvas(
-          await buildCanvas(now, await buildBarePlot(now)),
+          await buildCanvas(now),
           deviceId,
           apiKey,
           refreshNow && PRIMARY === 'canvas',

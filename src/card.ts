@@ -189,8 +189,13 @@ export async function buildBitFrame(frame: number, now: Date): Promise<Buffer> {
   return sharp(png).greyscale().threshold(150).png().toBuffer();
 }
 
-/** Plot only — no baked title bar or footer — for embedding in a canvas card. */
-export async function buildBarePlot(now: Date): Promise<Buffer> {
+/** Plot only — no baked text — for embedding in a canvas card. With
+ *  `geometryOnly` the image is just curves/bands/marks: even the axis labels
+ *  are left to the canvas, and the plot stretches over the given height. */
+export async function buildBarePlot(
+  now: Date,
+  opts: { geometryOnly?: boolean; height?: number } = {},
+): Promise<Buffer> {
   const { msg, cols } = await collect(now);
   const a = sampleDay(PLACES[0], now);
   const b = sampleDay(PLACES[1], now);
@@ -211,9 +216,10 @@ export async function buildBarePlot(now: Date): Promise<Buffer> {
       axisOffsetH: tzOffsetHours(PLACES[0].tz, now),
       frame: 0,
       bare: true,
+      geometryOnly: opts.geometryOnly,
     },
     296,
-    152,
+    opts.height ?? 152,
   );
   return sharp(png).greyscale().threshold(150).png().toBuffer();
 }

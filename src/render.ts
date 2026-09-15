@@ -8,6 +8,7 @@ import {
   NOW_H,
   STEP_MIN,
   WINDOW_H,
+  fmtOffset,
   type CityPath,
 } from './sunpath.js';
 
@@ -138,15 +139,25 @@ export interface SharedInput {
   frame: number;
   /** Bare mode: skip the title bar and footer; the plot stretches to fill. */
   bare?: boolean;
+  /** Geometry-only: tick marks stay, labels are omitted (canvas draws them). */
+  geometryOnly?: boolean;
+  /** Axis labels as signed hours from now ("-6", "now", "+8") instead of clock time. */
+  relAxis?: boolean;
 }
 
 /** Compose the 296x152 shared-sun card and return a PNG buffer. */
 export function renderSharedCard(inp: SharedInput, width = 296, height = 152): Buffer {
   if (inp.bare) {
-    // no title bar / footer: the plot stretches over the whole 296x152 area
-    // (tick labels sit at Y_BOT + 13, so leave a strip below)
-    Y_TOP = 8;
-    Y_BOT = 130;
+    // no title bar / footer: the plot stretches over the whole area
+    if (inp.geometryOnly) {
+      // axis labels are drawn by the canvas below the image — leave only a
+      // strip for the tick marks themselves
+      Y_TOP = 6;
+      Y_BOT = height - 14;
+    } else {
+      Y_TOP = 8;
+      Y_BOT = 130;
+    }
   } else {
     Y_TOP = 38;
     Y_BOT = 122;
@@ -229,13 +240,14 @@ export function renderSharedCard(inp: SharedInput, width = 296, height = 152): B
   drawSunDot(ctx, px(NOW_H), py(eA), false, eA < 0, inp.frame);
   drawSunDot(ctx, px(NOW_H), py(eB), true, eB < 0, inp.frame);
 
-  // axis ticks at true clock hours (every 2h within the window)
+  // axis ticks every 2h, anchored ON "now" so the now-line hits a tick
   ctx.font = fontPx(10);
   ctx.textAlign = 'center';
   const startH = inp.a.startH;
-  const firstTick = Math.ceil(startH / 2) * 2;
-  for (let i = 0; i <= WINDOW_H / 2 + 1; i++) {
-    const hAbs = firstTick + i * 2;
+  const nowH = startH + NOW_H;
+  const kMin = Math.ceil((startH - nowH) / 2);
+  for (let k = kMin; ; k++) {
+    const hAbs = nowH + k * 2;
     if (hAbs > startH + WINDOW_H + 1e-9) break;
     const x = px(hAbs - startH);
     ctx.beginPath();
@@ -243,7 +255,12 @@ export function renderSharedCard(inp: SharedInput, width = 296, height = 152): B
     ctx.lineTo(x, Y_BOT + 3);
     ctx.stroke();
     const clockH = Math.round(((((hAbs + inp.axisOffsetH) % 24) + 24) % 24));
-    if (x < X1 - 10) ctx.fillText(String(clockH % 24).padStart(2, '0'), x, Y_BOT + 13);
+    if (x < X1 - 10 && !inp.geometryOnly) {
+      const label = inp.relAxis
+        ? fmtOffset(Math.round(hAbs - nowH))
+        : String(clockH % 24).padStart(2, '0');
+      ctx.fillText(label, x, Y_BOT + 13);
+    }
   }
 
   // title bar: one row per city (chip, name, temp, weather, condition),

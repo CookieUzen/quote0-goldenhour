@@ -86,3 +86,29 @@ function intervalsWhere(p: CityPath, lo: number, hi: number): Array<[number, num
 export function goldenIntervals(p: CityPath): Array<[number, number]> {
   return intervalsWhere(p, GOLD_LO, GOLD_HI);
 }
+
+/** Axis ticks for the plot: every 2h anchored ON "now" (so a `now` label
+ *  always exists and sits under the now-line). `offset` is signed hours from
+ *  now; `hour` is the window-relative hour, matching the marks in the image. */
+export function axisTicks(now: Date): Array<{ hour: number; offset: number }> {
+  const dayStart = utcDayStart(now);
+  const startH = nowHours(now, dayStart) - NOW_H;
+  const nowH = startH + NOW_H;
+  const kMin = Math.ceil((startH - nowH) / 2);
+  const ticks: Array<{ hour: number; offset: number }> = [];
+  for (let k = kMin; ; k++) {
+    const hAbs = nowH + k * 2;
+    if (hAbs > startH + WINDOW_H + 1e-9) break;
+    const hour = hAbs - startH;
+    // mirror the image's right-edge guard (labels stop before x = X1 - 10)
+    if (hour >= ((280 - 10) / 280) * WINDOW_H) break;
+    ticks.push({ hour, offset: Math.round(hAbs - nowH) });
+  }
+  return ticks;
+}
+
+/** "+2", "-6", "now". */
+export function fmtOffset(o: number): string {
+  if (o === 0) return 'now';
+  return o > 0 ? `+${o}` : `-${Math.abs(o)}`;
+}

@@ -84,7 +84,12 @@ export function pushCard(
 
 /** Push the canvas card (data + windowData) to the device's canvas slot. */
 export function pushCanvas(
-  payload: { data: Record<string, unknown>; windowData: unknown; taskAlias: string },
+  payload: {
+    data: Record<string, unknown>;
+    windowData: unknown;
+    layoutFull?: unknown;
+    taskAlias: string;
+  },
   deviceId: string,
   apiKey: string,
   refreshNow = true,
@@ -94,6 +99,7 @@ export function pushCanvas(
     {
       data: payload.data,
       windowData: payload.windowData,
+      ...(payload.layoutFull ? { layoutFull: payload.layoutFull } : {}),
       taskAlias: payload.taskAlias,
       border: 0,
     },
