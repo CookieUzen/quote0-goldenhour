@@ -59,9 +59,11 @@ async function main(): Promise<void> {
         `= ${(INTERVAL_S * POMO_TICKS) / 60}m (Ctrl-C to stop)`,
     );
     let i = 0;
+    const pomoDur = `${Math.round((INTERVAL_S * POMO_TICKS) / 60)}m`;
     const tick = async (): Promise<void> => {
       const ch = channels[i % channels.length];
-      const pomo = `${(i % POMO_TICKS) + 1}/${POMO_TICKS}`;
+      // e.g. "1/6 (30m)" — the span makes the counter self-explanatory
+      const pomo = `${(i % POMO_TICKS) + 1}/${POMO_TICKS} (${pomoDur})`;
       try {
         await pushOnce(ch, true, pomo);
         console.log(new Date().toISOString(), `→ ${ch} (${pomo})`);
