@@ -114,8 +114,8 @@ export function renderCard(cols: Column[], width = 296, height = 152, footer?: s
 
 const X0 = 8; // plot left
 const X1 = 288; // plot right (full width below the title bar)
-const Y_TOP = 38; // plot top (= E_MAX elevation)
-const Y_BOT = 122; // plot bottom (= E_MIN elevation)
+let Y_TOP = 38; // plot top (= E_MAX elevation)
+let Y_BOT = 122; // plot bottom (= E_MIN elevation)
 const E_MIN = -30;
 const E_MAX = 90;
 
@@ -136,10 +136,21 @@ export interface SharedInput {
   /** Axis labels are shown in this timezone's local clock (offset vs UTC, e.g. +7). */
   axisOffsetH: number;
   frame: number;
+  /** Bare mode: skip the title bar and footer; the plot stretches to fill. */
+  bare?: boolean;
 }
 
 /** Compose the 296x152 shared-sun card and return a PNG buffer. */
 export function renderSharedCard(inp: SharedInput, width = 296, height = 152): Buffer {
+  if (inp.bare) {
+    // no title bar / footer: the plot stretches over the whole 296x152 area
+    // (tick labels sit at Y_BOT + 13, so leave a strip below)
+    Y_TOP = 8;
+    Y_BOT = 130;
+  } else {
+    Y_TOP = 38;
+    Y_BOT = 122;
+  }
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext('2d') as SKRSContext2D;
 
@@ -237,12 +248,14 @@ export function renderSharedCard(inp: SharedInput, width = 296, height = 152): B
 
   // title bar: one row per city (chip, name, temp, weather, condition),
   // custom message space on the right
-  drawTitleBar(ctx, inp);
+  if (!inp.bare) drawTitleBar(ctx, inp);
 
   // footer: date, centred under the plot
-  ctx.font = fontPx(10);
-  ctx.textAlign = 'center';
-  ctx.fillText(inp.footer, (X0 + X1) / 2, height - 3);
+  if (!inp.bare) {
+    ctx.font = fontPx(10);
+    ctx.textAlign = 'center';
+    ctx.fillText(inp.footer, (X0 + X1) / 2, height - 3);
+  }
 
   return canvas.toBuffer('image/png');
 }

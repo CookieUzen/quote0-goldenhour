@@ -76,14 +76,20 @@ secretspec set QUOTE0_DEVICE_ID --provider dotenv  # device ID from the Dot. app
 Then run through secretspec so the values land in the environment:
 
 ```sh
-secretspec run --provider dotenv -- npm run push   # one push, forces device refresh
-secretspec run --provider dotenv -- npm run loop   # every INTERVAL sec (default 300)
-INTERVAL=900 secretspec run --provider dotenv -- npm run loop
+secretspec run --provider dotenv -- npm run push            # image + canvas (default)
+secretspec run --provider dotenv -- npm run loop
+PUSH_MODE=text secretspec run --provider dotenv -- npm run loop:text   # legacy text card
+CANVAS_LAYOUT=chart secretspec run --provider dotenv -- npm run loop
 ```
 
 `npm run push` forces an immediate device refresh (`refreshNow: true`); in
 `loop` mode pushes are **not** forced — new content is uploaded and the device
-picks it up on its own auto-refresh cycle.```
+picks it up on its own auto-refresh cycle.
+
+Both slots are updated on every push, but only the **primary** one ever forces
+a refresh / gets displayed — the other updates silently (and is pushed first),
+so the device never flip-flops between pages. Default primary is the image
+card; switch with `PUSH_PRIMARY=text`.```
 
 The card is rendered, thresholded to 1-bit, and pushed to
 `POST /api/authV2/open/device/{deviceId}/image` (`ditherType: NONE`, since the

@@ -76,15 +76,20 @@ function tzOffsetHours(tz: string, at: Date): number {
 /** Text-card summary sent alongside the image (device /text content slot). */
 export interface TextPayload {
   title: string;
-  message: string;
+  message?: string;
   signature: string;
 }
 
-/** Render one frame; returns both the PNG and the text-card payload. */
-export async function buildFrameAndText(
-  frame: number,
-  now: Date,
-): Promise<{ png: Buffer; text: TextPayload }> {
+/** Resolved card state shared by the image and canvas renderers. */
+export interface CardData {
+  msg?: string;
+  cols: Column[];
+  footer: string;
+  quote: string;
+}
+
+/** Resolve message, weather columns, footer date and the phase quote. */
+export async function collect(now: Date): Promise<CardData> {
   const msg = await resolveMessage();
   const cols: Column[] = [];
 
@@ -97,7 +102,7 @@ export async function buildFrameAndText(
       stage: info.stage,
       tempC: w?.tempC ?? null,
       code: w?.code ?? -1,
-      frame,
+      frame: 0,
     });
     console.log(
       `${p.name.padEnd(10)} ${localTime(now, p.tz)}  ${info.stage.padEnd(13)} ` +
@@ -110,19 +115,30 @@ export async function buildFrameAndText(
     timeZone: PLACES[0].tz,
   }).format(now);
 
+  const quote = sharedLightTitle(cols[0].stage, cols[1].stage);
+  return { msg, cols, footer, quote };
+}
+
+/** Render one frame; returns both the PNG and the text-card payload. */
+export async function buildFrameAndText(
+  frame: number,
+  now: Date,
+): Promise<{ png: Buffer; text: TextPayload }> {
+  const { msg, cols, footer, quote } = await collect(now);
+
   const a = cols[0];
   const b = cols[1];
-  // body: the custom message (if any), then one weather line per city
-  const msgLine = msg ? `${msg}\n` : '';
-  const weather =
+  // weather moves to the signature (small print) so the message body stays
+  // short — long bodies make the device truncate the headline
+  const weatherSig =
     `${a.name} ${a.tempC != null ? Math.round(a.tempC) : '--'}° ${
       STAGE_LABEL[a.stage]
-    }\n${b.name} ${b.tempC != null ? Math.round(b.tempC) : '--'}° ${STAGE_LABEL[b.stage]}`;
+    } · ${b.name} ${b.tempC != null ? Math.round(b.tempC) : '--'}° ${STAGE_LABEL[b.stage]}`;
   const text: TextPayload = {
     // headline: always the light-phase quote (random variant)
-    title: sharedLightTitle(a.stage, b.stage),
-    message: msg ? `${msg}\n${weather}` : weather,
-    signature: footer,
+    title: quote,
+    ...(msg ? { message: msg } : {}),
+    signature: `${weatherSig} · ${footer}`,
   };
 
   let png: Buffer;
@@ -134,7 +150,7 @@ export async function buildFrameAndText(
   const goldenA = goldenIntervals(a);
   const goldenB = goldenIntervals(b);
   const fmt = (ivs: Array<[number, number]>) =>
-    ivs.map(([s, e]) => `${s.toFixed(1)}–${e.toFixed(1)}`).join(', ') || 'none';
+    ivs.map(([s, e]) => `${s.toFixed(1)}\u2013${e.toFixed(1)}`).join(', ') || 'none';
   console.log(`golden hours — ${a.place.name}: ${fmt(goldenA)} | ${b.place.name}: ${fmt(goldenB)}`);
 
   png = renderSharedCard(
@@ -170,5 +186,34 @@ export async function buildFrame(frame: number, now: Date): Promise<Buffer> {
 /** Render one frame and threshold it to pure 1-bit for the device. */
 export async function buildBitFrame(frame: number, now: Date): Promise<Buffer> {
   const png = await buildFrame(frame, now);
+  return sharp(png).greyscale().threshold(150).png().toBuffer();
+}
+
+/** Plot only — no baked title bar or footer — for embedding in a canvas card. */
+export async function buildBarePlot(now: Date): Promise<Buffer> {
+  const { msg, cols } = await collect(now);
+  const a = sampleDay(PLACES[0], now);
+  const b = sampleDay(PLACES[1], now);
+  const png = renderSharedCard(
+    {
+      a,
+      b,
+      goldenA: goldenIntervals(a),
+      goldenB: goldenIntervals(b),
+      tempA: cols[0].tempC,
+      tempB: cols[1].tempC,
+      codeA: cols[0].code,
+      codeB: cols[1].code,
+      stageA: cols[0].stage,
+      stageB: cols[1].stage,
+      msg,
+      footer: '',
+      axisOffsetH: tzOffsetHours(PLACES[0].tz, now),
+      frame: 0,
+      bare: true,
+    },
+    296,
+    152,
+  );
   return sharp(png).greyscale().threshold(150).png().toBuffer();
 }

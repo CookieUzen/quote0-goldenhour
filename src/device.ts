@@ -31,7 +31,7 @@ export function requireConfig(): { apiKey: string; deviceId: string } {
 
 /** POST a content payload to one of the device's content endpoints. */
 async function pushContent(
-  path: 'image' | 'text',
+  path: 'image' | 'text' | 'canvas',
   content: Record<string, unknown>,
   deviceId: string,
   apiKey: string,
@@ -82,9 +82,30 @@ export function pushCard(
   );
 }
 
+/** Push the canvas card (data + windowData) to the device's canvas slot. */
+export function pushCanvas(
+  payload: { data: Record<string, unknown>; windowData: unknown; taskAlias: string },
+  deviceId: string,
+  apiKey: string,
+  refreshNow = true,
+): Promise<void> {
+  return pushContent(
+    'canvas',
+    {
+      data: payload.data,
+      windowData: payload.windowData,
+      taskAlias: payload.taskAlias,
+      border: 0,
+    },
+    deviceId,
+    apiKey,
+    refreshNow,
+  );
+}
+
 /** Push the text summary to the device's text content slot. */
 export function pushText(
-  payload: { title: string; message: string; signature: string },
+  payload: { title: string; message?: string; signature: string },
   deviceId: string,
   apiKey: string,
   refreshNow = true,
