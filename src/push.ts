@@ -4,51 +4,45 @@ import { buildCanvas } from './canvas.js';
 import { pushCard, pushCanvas, pushText, requireConfig } from './device.js';
 
 const INTERVAL_S = Math.max(60, Number(process.env.INTERVAL ?? 300));
-/** Which content slot gets the forced refresh / ends up displayed. */
-const PRIMARY: 'image' | 'text' | 'canvas' =
-  process.env.PUSH_PRIMARY === 'text' || process.env.PUSH_PRIMARY === 'canvas'
-    ? process.env.PUSH_PRIMARY
-    : 'image';
-/** Canvas mode is the default; the text card is the legacy fallback. */
-const CANVAS_MODE = !(
-  process.argv.includes('--text') || process.env.PUSH_MODE === 'text'
-);
+/** Pomodoro-ish cycle length for the loop counter (INTERVAL_S * N = full cycle). */
+const POMO_TICKS = Math.max(1, Number(process.env.POMO_TICKS ?? 6));
 
-async function pushOnce(refreshNow: boolean): Promise<void> {
+/** Loop channels: rotate through these, force-refreshing each in turn so the
+ *  device switches pages (e.g. "sun,msg" = sun chart, then the message page). */
+type Channel = 'image' | 'text' | 'sun' | 'msg';
+const CHANNELS = (process.env.LOOP_CHANNELS ?? 'sun,msg')
+  .split(',')
+  .map((s) => s.trim())
+  .filter((s): s is Channel => (['image', 'text', 'sun', 'msg'] as const).includes(s as Channel));
+
+async function pushOnce(
+  target: Channel,
+  refreshNow: boolean,
+  pomo?: string,
+): Promise<void> {
   const { apiKey, deviceId } = requireConfig();
   const now = new Date();
   const { png, text } = await buildFrameAndText(0, now);
 
-  // Push BOTH content slots, but only ever force-refresh the primary one —
-  // otherwise the device jumps to the image page, then the text page, and
-  // back, every single update. The secondary slot updates silently, and is
-  // pushed FIRST so the device settles on the primary page.
-  const imagePush: [string, Promise<void>] = [
-    'image',
-    pushCard(png, deviceId, apiKey, refreshNow && PRIMARY === 'image'),
-  ];
-  const secondPush: [string, Promise<void>] = CANVAS_MODE
-    ? [
-        'canvas',
-        pushCanvas(
-          await buildCanvas(now),
-          deviceId,
-          apiKey,
-          refreshNow && PRIMARY === 'canvas',
-        ),
-      ]
-    : [
-        'text',
-        pushText(text, deviceId, apiKey, refreshNow && PRIMARY === 'text'),
-      ];
-  const channels =
-    PRIMARY === 'image' ? [secondPush, imagePush] : [imagePush, secondPush];
-  const results = await Promise.allSettled(channels.map(([, p]) => p));
-  results.forEach((r, i) => {
-    if (r.status === 'rejected') {
-      console.warn(`⚠ ${channels[i][0]} push failed (continuing):`, r.reason?.message ?? r.reason);
-    }
-  });
+  const [name, job]: [string, Promise<void>] =
+    target === 'image'
+      ? ['image', pushCard(png, deviceId, apiKey, refreshNow)]
+      : target === 'text'
+        ? ['text', pushText(text, deviceId, apiKey, refreshNow)]
+        : [
+            'canvas',
+            pushCanvas(
+              await buildCanvas(now, { mode: target, pomo }),
+              deviceId,
+              apiKey,
+              refreshNow,
+            ),
+          ];
+  try {
+    await job;
+  } catch (err) {
+    console.warn(`⚠ ${name} push failed (continuing):`, err instanceof Error ? err.message : err);
+  }
 }
 
 async function main(): Promise<void> {
@@ -56,16 +50,23 @@ async function main(): Promise<void> {
   const loop = process.argv.includes('--loop');
 
   if (loop) {
+    const channels = CHANNELS.length ? CHANNELS : (['sun', 'msg'] as Channel[]);
     console.log(
-      `loop: pushing every ${INTERVAL_S}s without forcing refresh ` +
-        '(device updates on its own cycle; Ctrl-C to stop)',
+      `loop: rotating [${channels.join(', ')}] every ${INTERVAL_S}s, force-refreshing ` +
+        `the active page; pomo cycle ${(INTERVAL_S / 60).toFixed(0)}m x ${POMO_TICKS} ` +
+        `= ${(INTERVAL_S * POMO_TICKS) / 60}m (Ctrl-C to stop)`,
     );
+    let i = 0;
     const tick = async (): Promise<void> => {
+      const ch = channels[i % channels.length];
+      const pomo = `${(i % POMO_TICKS) + 1}/${POMO_TICKS}`;
       try {
-        await pushOnce(false);
+        await pushOnce(ch, true, pomo);
+        console.log(new Date().toISOString(), `→ ${ch} (${pomo})`);
       } catch (err) {
         console.error(new Date().toISOString(), 'push failed:', err);
       }
+      i++;
     };
     await tick();
     const timer = setInterval(tick, INTERVAL_S * 1000);
@@ -77,7 +78,9 @@ async function main(): Promise<void> {
     process.on('SIGINT', stop);
     process.on('SIGTERM', stop);
   } else {
-    await pushOnce(true);
+    // one-shot: the image card is the main display; the sun canvas updates silently
+    await pushOnce('image', true);
+    await pushOnce('sun', false);
   }
 }
 
