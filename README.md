@@ -87,6 +87,25 @@ image is already 1-bit). **The device needs an "Open API" content card in its
 loop task in the Dot. app**, otherwise pushed content has nowhere to show.
 `DRY_RUN=1` runs the whole pipeline without POSTing.
 
+## 🐳 Docker (server deployment)
+
+The included `Dockerfile` + `compose.yaml` run the push loop on any server.
+Secrets are **never baked into the image** — they are injected at runtime from
+the same `.env` that secretspec writes:
+
+```sh
+# on the server
+git clone https://github.com/CookieUzen/quote0-goldenhour && cd quote0-goldenhour
+printf 'QUOTE0_API_KEY=dot_app_...\nQUOTE0_DEVICE_ID=...\n' > .env
+docker compose up -d
+
+# optional overrides (compose reads .env for these too)
+echo 'INTERVAL=900' >> .env
+```
+
+Logs: `docker compose logs -f`. Stop: `docker compose down`. The container
+runs as a non-root user and restarts automatically unless stopped.
+
 ## ⚙️ Configuration
 
 Coordinates and timezones are stored in `src/locations.ts`. You can easily swap these for your own cities:

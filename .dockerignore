@@ -1,0 +1,10 @@
+# Ignore everything local — the image gets source only, never secrets/state
+.git
+.env
+.devenv
+node_modules
+dist
+out
+*.log
+devenv.lock
+devenv.local.nix

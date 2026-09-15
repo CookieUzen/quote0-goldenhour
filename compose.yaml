@@ -1,0 +1,13 @@
+services:
+  goldenhour:
+    build: .
+    image: quote0-goldenhour
+    restart: unless-stopped
+    # secrets from secretspec's dotenv provider (QUOTE0_API_KEY,
+    # QUOTE0_DEVICE_ID) — never baked into the image
+    env_file:
+      - .env
+    environment:
+      INTERVAL: ${INTERVAL:-300}
+      CARD_MSG: ${CARD_MSG:-}
+      MESSAGE_URL: ${MESSAGE_URL:-}
