@@ -41,11 +41,11 @@ const nowrap = (children: string, extra = ''): Record<string, unknown> =>
   });
 
 /** Title row: headline (left, ellipsized) · date (right). */
-const titleRow = (): Record<string, unknown> =>
+const titleRow = (bold?: boolean): Record<string, unknown> =>
   el('div', {
     tw: 'flex flex-row items-center justify-between gap-[6px] shrink-0 text-pixel-12',
     children: [
-      nowrap('{{get inputData "headline" default=""}}'),
+      nowrap('{{get inputData "headline" default=""}}', bold ? 'font-bold' : ''),
       el('span', {
         tw: 'shrink-0 text-pixel-8',
         children: '{{get inputData "date" default=""}}',
@@ -146,7 +146,8 @@ export async function buildCanvas(
   const rows: Array<Record<string, unknown>> =
     mode === 'sun'
       ? [
-          titleRow(),
+          // sun page: the headline (msg ?? quote) is bold
+          titleRow(true),
           el('div', {
             tw: 'flex flex-1 min-h-0 min-w-0 justify-center',
             children: [
@@ -170,8 +171,7 @@ export async function buildCanvas(
         ]
       : [
           titleRow(),
-          msg ? messageRow() : quoteCenterRow(),
-          bottomRow(opts.pomo, hasWx),
+          msg ? messageRow() : quoteCenterRow(),          bottomRow(opts.pomo, hasWx),
         ];
 
   return {
