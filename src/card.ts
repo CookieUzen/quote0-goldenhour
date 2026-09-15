@@ -1,6 +1,7 @@
 import sharp from 'sharp';
 import { PLACES } from './locations.js';
-import { sunInfo } from './stage.js';
+import { STAGE_LABEL, sunInfo, type Stage } from './stage.js';
+import { phaseOf, quoteFor } from './quotes.js';
 import { fetchWeather } from './weather.js';
 import { renderCard, renderSharedCard, type Column } from './render.js';
 import { goldenIntervals, sampleDay } from './sunpath.js';
@@ -50,6 +51,12 @@ function localTime(d: Date, tz: string): string {
   }).format(d);
 }
 
+/** Headline for the text card when there is no custom message: a quote for
+ *  the phase pair (quotes.json), falling back to the raw stage labels. */
+function sharedLightTitle(a: Stage, b: Stage): string {
+  return quoteFor(phaseOf(a), phaseOf(b)) ?? `${STAGE_LABEL[a]} · ${STAGE_LABEL[b]}`;
+}
+
 /** Hours between the given timezone's clock and UTC at `at` (e.g. +7 for Jakarta). */
 function tzOffsetHours(tz: string, at: Date): number {
   const probe = new Date(Math.floor(at.getTime() / 3_600_000) * 3_600_000);
@@ -66,8 +73,18 @@ function tzOffsetHours(tz: string, at: Date): number {
   return off;
 }
 
-/** Render one frame as a colour PNG buffer. */
-export async function buildFrame(frame: number, now: Date): Promise<Buffer> {
+/** Text-card summary sent alongside the image (device /text content slot). */
+export interface TextPayload {
+  title: string;
+  message: string;
+  signature: string;
+}
+
+/** Render one frame; returns both the PNG and the text-card payload. */
+export async function buildFrameAndText(
+  frame: number,
+  now: Date,
+): Promise<{ png: Buffer; text: TextPayload }> {
   const msg = await resolveMessage();
   const cols: Column[] = [];
 
@@ -93,11 +110,26 @@ export async function buildFrame(frame: number, now: Date): Promise<Buffer> {
     timeZone: PLACES[0].tz,
   }).format(now);
 
-  if (STYLE === 'columns') {
-    return renderCard(cols, 296, 152, footer);
-  }
+  const a = cols[0];
+  const b = cols[1];
+  // body: the custom message (if any), then one weather line per city
+  const msgLine = msg ? `${msg}\n` : '';
+  const weather =
+    `${a.name} ${a.tempC != null ? Math.round(a.tempC) : '--'}° ${
+      STAGE_LABEL[a.stage]
+    }\n${b.name} ${b.tempC != null ? Math.round(b.tempC) : '--'}° ${STAGE_LABEL[b.stage]}`;
+  const text: TextPayload = {
+    // headline: always the light-phase quote (random variant)
+    title: sharedLightTitle(a.stage, b.stage),
+    message: msg ? `${msg}\n${weather}` : weather,
+    signature: footer,
+  };
 
-  const a = sampleDay(PLACES[0], now);
+  let png: Buffer;
+  if (STYLE === 'columns') {
+    png = renderCard(cols, 296, 152, footer);
+  } else {
+    const a = sampleDay(PLACES[0], now);
   const b = sampleDay(PLACES[1], now);
   const goldenA = goldenIntervals(a);
   const goldenB = goldenIntervals(b);
@@ -105,7 +137,7 @@ export async function buildFrame(frame: number, now: Date): Promise<Buffer> {
     ivs.map(([s, e]) => `${s.toFixed(1)}–${e.toFixed(1)}`).join(', ') || 'none';
   console.log(`golden hours — ${a.place.name}: ${fmt(goldenA)} | ${b.place.name}: ${fmt(goldenB)}`);
 
-  return renderSharedCard(
+  png = renderSharedCard(
     {
       a,
       b,
@@ -125,6 +157,14 @@ export async function buildFrame(frame: number, now: Date): Promise<Buffer> {
     296,
     152,
   );
+  }
+
+  return { png, text };
+}
+
+/** Render one frame as a colour PNG buffer. */
+export async function buildFrame(frame: number, now: Date): Promise<Buffer> {
+  return (await buildFrameAndText(frame, now)).png;
 }
 
 /** Render one frame and threshold it to pure 1-bit for the device. */

@@ -29,37 +29,71 @@ export function requireConfig(): { apiKey: string; deviceId: string } {
   return { apiKey, deviceId };
 }
 
-/** Push a PNG (already 1-bit, 296x152) to the device. */
-export async function pushCard(
-  png: Buffer,
+/** POST a content payload to one of the device's content endpoints. */
+async function pushContent(
+  path: 'image' | 'text',
+  content: Record<string, unknown>,
   deviceId: string,
   apiKey: string,
+  refreshNow: boolean,
 ): Promise<void> {
-  const body = {
-    refreshNow: true,
-    // the card is already thresholded to 1-bit — skip device-side dithering
-    image: png.toString('base64'),
-    border: 0,
-    ditherType: 'NONE',
-    taskAlias: 'golden-hour card',
-  };
-
   if (process.env.DRY_RUN) {
-    console.log(`DRY_RUN: would POST ${API_BASE}/api/authV2/open/device/${deviceId}/image`);
+    console.log(
+      `DRY_RUN: would POST ${API_BASE}/api/authV2/open/device/${deviceId}/${path}` +
+        ` (refreshNow: ${refreshNow})`,
+    );
     return;
   }
 
-  const res = await fetch(`${API_BASE}/api/authV2/open/device/${deviceId}/image`, {
+  const res = await fetch(`${API_BASE}/api/authV2/open/device/${deviceId}/${path}`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ refreshNow, ...content }),
   });
   if (!res.ok) {
     throw new Error(`HTTP ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);
   }
   const json = (await res.json().catch(() => ({}))) as { message?: string };
-  console.log(`pushed: ${json.message ?? 'ok'}`);
+  console.log(`pushed (${path}): ${json.message ?? 'ok'}`);
+}
+
+/** Push the 1-bit PNG (296x152) to the device's image content slot. */
+export function pushCard(
+  png: Buffer,
+  deviceId: string,
+  apiKey: string,
+  refreshNow = true,
+): Promise<void> {
+  return pushContent(
+    'image',
+    {
+      // the card is already thresholded to 1-bit — skip device-side dithering
+      image: png.toString('base64'),
+      border: 0,
+      ditherType: 'NONE',
+      taskAlias: 'golden-hour card',
+    },
+    deviceId,
+    apiKey,
+    refreshNow,
+  );
+}
+
+/** Push the text summary to the device's text content slot. */
+export function pushText(
+  payload: { title: string; message: string; signature: string },
+  deviceId: string,
+  apiKey: string,
+  refreshNow = true,
+): Promise<void> {
+  return pushContent(
+    'text',
+    { ...payload, taskAlias: 'golden-hour text' },
+    deviceId,
+    apiKey,
+    refreshNow,
+  );
 }

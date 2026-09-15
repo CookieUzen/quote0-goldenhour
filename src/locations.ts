@@ -11,5 +11,5 @@ export interface Place {
 
 export const PLACES: Place[] = [
   { name: 'JAKARTA', lat: -6.2088, lon: 106.8456, tz: 'Asia/Jakarta' },
-  { name: 'HONG KONG', lat: 22.3193, lon: 114.1694, tz: 'Asia/Hong_Kong' },
+  { name: 'KYOTO UJI', lat: 34.8893, lon: 135.8048, tz: 'Asia/Tokyo' },
 ];

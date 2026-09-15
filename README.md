@@ -76,16 +76,23 @@ secretspec set QUOTE0_DEVICE_ID --provider dotenv  # device ID from the Dot. app
 Then run through secretspec so the values land in the environment:
 
 ```sh
-secretspec run --provider dotenv -- npm run push   # one push, now
+secretspec run --provider dotenv -- npm run push   # one push, forces device refresh
 secretspec run --provider dotenv -- npm run loop   # every INTERVAL sec (default 300)
 INTERVAL=900 secretspec run --provider dotenv -- npm run loop
 ```
 
+`npm run push` forces an immediate device refresh (`refreshNow: true`); in
+`loop` mode pushes are **not** forced — new content is uploaded and the device
+picks it up on its own auto-refresh cycle.```
+
 The card is rendered, thresholded to 1-bit, and pushed to
 `POST /api/authV2/open/device/{deviceId}/image` (`ditherType: NONE`, since the
-image is already 1-bit). **The device needs an "Open API" content card in its
-loop task in the Dot. app**, otherwise pushed content has nowhere to show.
-`DRY_RUN=1` runs the whole pipeline without POSTing.
+image is already 1-bit). **The device needs matching content cards in its loop
+task in the Dot. app** — an "Open API" image card *and* optionally a text card,
+since each push also updates the text content slot (`title` = temps + stages,
+`message` = cities + local times, `signature` = date). A failure on one channel
+(e.g. the slot isn't configured on the device) is logged as a warning; the loop
+keeps running. `DRY_RUN=1` runs the whole pipeline without POSTing.
 
 ## 🐳 Docker (server deployment)
 

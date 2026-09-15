@@ -1,0 +1,132 @@
+{
+  "night/night": [
+    "under the same stars",
+    "sharing the moonlight",
+    "two windows, one night sky",
+    "same dark, same moon"
+  ],
+  "night/twilight": [
+    "my stars, your first light",
+    "night here, your sky loosening there",
+    "you're closer to morning than me"
+  ],
+  "night/dawn": [
+    "my night is your sunrise",
+    "the sun is leaving me, arriving to you",
+    "as I go dark, you light up"
+  ],
+  "night/day": [
+    "you have the sun; keep it warm",
+    "my midnight, your afternoon",
+    "the sun works your shift today"
+  ],
+  "night/dusk": [
+    "night here, dusk there",
+    "the day just left your sky",
+    "we pass the dark between us"
+  ],
+
+  "twilight/night": [
+    "my sky is loosening, yours is deep dark",
+    "first light here, last dark there",
+    "dawn is on my side of the world"
+  ],
+  "twilight/twilight": [
+    "half-light, both skies",
+    "the sun is deciding for both of us",
+    "somewhere between night and day, together"
+  ],
+  "twilight/dawn": [
+    "my half-light, your sunrise",
+    "light creeping into both skies",
+    "two horizons waking up"
+  ],
+  "twilight/day": [
+    "half-light here, full sun there",
+    "the sun chose you first",
+    "my grey, your gold"
+  ],
+  "twilight/dusk": [
+    "the last light in both our skies",
+    "two skies winding down",
+    "the sun, saying goodnight twice"
+  ],
+
+  "dawn/night": [
+    "sunrise here, night there",
+    "we're trading places with the sun",
+    "my dawn is your bedtime"
+  ],
+  "dawn/twilight": [
+    "sunrise here, half-light there",
+    "morning finds me first",
+    "the sun is testing my sky"
+  ],
+  "dawn/dawn": [
+    "dawn, for both of us",
+    "twin sunrises",
+    "the sun greets both of us at once"
+  ],
+  "dawn/day": [
+    "my sunrise, your full sun",
+    "the sun just clocked in for you",
+    "waking up into your daylight"
+  ],
+  "dawn/dusk": [
+    "I get the sunrise, you get the sunset",
+    "the sun clocks in here, clocks out there",
+    "first light here, last light there"
+  ],
+
+  "day/night": [
+    "full sun here — sleep well there",
+    "my blue sky, your dark night",
+    "the sun works my shift today"
+  ],
+  "day/twilight": [
+    "full sun here, half-light there",
+    "noon for me, in-between for you",
+    "bright here, soft there"
+  ],
+  "day/dawn": [
+    "full sun here, sunrise there",
+    "my afternoon is your morning",
+    "the sun stays late for me"
+  ],
+  "day/day": [
+    "sun up in both cities",
+    "full daylight, together",
+    "same sun, two blue skies"
+  ],
+  "day/dusk": [
+    "high sun here, golden hour there",
+    "noon for me, your gold hour there",
+    "the sun peaks here, softens there"
+  ],
+
+  "dusk/night": [
+    "dusk here, night there — goodnight",
+    "my sunset, your midnight",
+    "the day ends here first"
+  ],
+  "dusk/twilight": [
+    "dusk here, half-light there",
+    "both skies going gentle",
+    "the light is leaving us slowly"
+  ],
+  "dusk/dawn": [
+    "you get the sunrise, I get the sunset",
+    "the sun trades our shifts",
+    "my golden hour is your dawn"
+  ],
+  "dusk/day": [
+    "golden hour here, high sun there",
+    "my gold, your glare",
+    "the sun peaks there, softens here"
+  ],
+  "dusk/dusk": [
+    "dusk, for both of us",
+    "two golden skies",
+    "the sun signs off for both of us"
+  ]
+}
