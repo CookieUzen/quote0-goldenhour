@@ -1,5 +1,5 @@
 import { setupFonts } from './render.js';
-import { buildFrameAndText } from './card.js';
+import { buildFrameAndText, to1bit } from './card.js';
 import { buildCanvas } from './canvas.js';
 import { pushCard, pushCanvas, pushText, requireConfig } from './device.js';
 
@@ -23,10 +23,12 @@ async function pushOnce(
   const { apiKey, deviceId } = requireConfig();
   const now = new Date();
   const { png, text } = await buildFrameAndText(0, now);
+  // the device gets the hard 1-bit version (ditherType NONE = render as-is)
+  const bit = await to1bit(png);
 
   const [name, job]: [string, Promise<void>] =
     target === 'image'
-      ? ['image', pushCard(png, deviceId, apiKey, refreshNow)]
+      ? ['image', pushCard(bit, deviceId, apiKey, refreshNow)]
       : target === 'text'
         ? ['text', pushText(text, deviceId, apiKey, refreshNow)]
         : [

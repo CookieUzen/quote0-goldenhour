@@ -183,10 +183,13 @@ export async function buildFrame(frame: number, now: Date): Promise<Buffer> {
   return (await buildFrameAndText(frame, now)).png;
 }
 
+/** Threshold a rendered frame to pure 1-bit (what the device should receive). */
+export function to1bit(png: Buffer): Promise<Buffer> {
+  return sharp(png).greyscale().threshold(150).png().toBuffer();
+}
 /** Render one frame and threshold it to pure 1-bit for the device. */
 export async function buildBitFrame(frame: number, now: Date): Promise<Buffer> {
-  const png = await buildFrame(frame, now);
-  return sharp(png).greyscale().threshold(150).png().toBuffer();
+  return to1bit(await buildFrame(frame, now));
 }
 
 /** Plot only — no baked text — for embedding in a canvas card. With
@@ -221,5 +224,5 @@ export async function buildBarePlot(
     296,
     opts.height ?? 152,
   );
-  return sharp(png).greyscale().threshold(150).png().toBuffer();
+  return to1bit(png);
 }
